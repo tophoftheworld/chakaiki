@@ -6,6 +6,8 @@ const getStorage = FirebaseMod.getStorage;
 const initAuth = FirebaseMod.initAuth;
 const getDb = FirebaseMod.getDb;
 const getCurrentUserId = FirebaseMod.getCurrentUserId;
+const requireAuthUserId = FirebaseMod.requireAuthUserId;
+const skipAnonymousAuthByConfig = FirebaseMod.skipAnonymousAuthByConfig;
 const USER_PROFILES_COLLECTION = FirebaseMod.USER_PROFILES_COLLECTION || 'userProfiles';
 /** Bind data.js exports without static named imports (stale CDN cache must not brick boot). */
 function bindDataExport(name, { sync = false, empty = false, noop = false, fallback } = {}) {
@@ -825,7 +827,7 @@ function chooseBrandLogoExt(file) {
 }
 
 async function uploadBrandLogoFile(brandId, logoFile) {
-  await initAuth().catch(() => null);
+  await initAuth();
   const st = getStorage();
   if (!st) throw new Error('Storage not configured');
   const ext = chooseBrandLogoExt(logoFile);
@@ -834,10 +836,43 @@ async function uploadBrandLogoFile(brandId, logoFile) {
   return ref.getDownloadURL();
 }
 
+function assertListOwner(listId) {
+  const me = String(getCurrentUserId() || '');
+  const list = (Array.isArray(window.USER_LISTS) ? window.USER_LISTS : [])
+    .find((l) => String(l.id) === String(listId));
+  if (!list || String(list.ownerId || '') !== me) {
+    throw new Error('Not allowed to edit this list');
+  }
+}
+
+async function assertEventOwner(eventId) {
+  const me = String(getCurrentUserId() || '');
+  const id = String(eventId || '').trim();
+  const cached = (Array.isArray(window.EVENTS) ? window.EVENTS : [])
+    .find((e) => String(e.id) === id);
+  if (cached) {
+    if (String(cached.submittedBy || '') !== me) {
+      throw new Error('Not allowed to edit this event');
+    }
+    return;
+  }
+  const db = getDb();
+  if (!db) throw new Error('Event not found');
+  const snap = await db.collection('events').doc(id).get();
+  if (!snap.exists || String(snap.data()?.submittedBy || '') !== me) {
+    throw new Error('Not allowed to edit this event');
+  }
+}
+
 function assertV2Firestore() {
   if (!getDb()) {
     const err = new Error('Firestore is required for Chakaiki. Configure FIREBASE_CONFIG in js/config.js.');
     window.__V2_FATAL__ = { code: 'firestore_required', message: err.message };
+    throw err;
+  }
+  if (!skipAnonymousAuthByConfig?.() && !getCurrentUserId()) {
+    const err = new Error('Sign-in required. Enable Anonymous Auth in Firebase Console and reload.');
+    window.__V2_FATAL__ = { code: 'auth_required', message: err.message };
     throw err;
   }
 }
@@ -1073,6 +1108,7 @@ window.V2Live = {
     assertV2Firestore();
     const id = String(eventId || '').trim();
     if (!id) throw new Error('Event id required');
+    await assertEventOwner(id);
     const updatePayload = { ...rest };
     if (coverPhotoFile) {
       const urls = await uploadPhotoFiles(id, [coverPhotoFile], {
@@ -1090,6 +1126,7 @@ window.V2Live = {
   async deleteEvent(eventId) {
     await initData();
     assertV2Firestore();
+    await assertEventOwner(eventId);
     await persistDeleteEvent(eventId);
     await refreshV2Data();
   },
@@ -1116,6 +1153,7 @@ window.V2Live = {
     assertV2Firestore();
     const id = String(listId || '').trim();
     if (!id) throw new Error('List id required');
+    assertListOwner(id);
     const { entries: rawEntries, ...rest } = payload || {};
     const patch = { ...rest };
     if (Array.isArray(rawEntries)) {
@@ -1127,6 +1165,7 @@ window.V2Live = {
   async deleteList(listId) {
     await initData();
     assertV2Firestore();
+    assertListOwner(listId);
     await persistDeleteList(listId);
     await refreshV2Data();
   },
@@ -1294,6 +1333,11 @@ window.V2Live = {
     await initData();
     assertV2Firestore();
     if (!postId) return;
+    const me = String(getCurrentUserId() || '');
+    const existing = (getLogs() || []).find((l) => String(l.id) === String(postId));
+    if (!existing || String(existing.userId || '') !== me) {
+      throw new Error('Not allowed to delete this post');
+    }
     await deleteLog(postId);
     await refreshV2Data();
   },

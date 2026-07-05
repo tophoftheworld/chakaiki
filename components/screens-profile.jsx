@@ -130,6 +130,11 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
             <div style={{ fontFamily: theme.sans, fontSize: 12, color: theme.muted, marginTop: 4 }}>
               {memberLine}
             </div>
+            {profile.ownerId ? (
+              <div style={{ fontFamily: theme.mono || 'ui-monospace, monospace', fontSize: 10, color: theme.muted, marginTop: 8, wordBreak: 'break-all', lineHeight: 1.4 }} title="Firebase user ID (for migration / admin setup)">
+                ID: {profile.ownerId}
+              </div>
+            ) : null}
           </div>
         </div>
 

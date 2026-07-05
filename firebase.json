@@ -1,0 +1,37 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      ".npm-cache/**",
+      ".tmp/**",
+      "components/**",
+      "scripts/**",
+      "app-main.jsx",
+      "build.mjs",
+      "package.json",
+      "README.md",
+      "DEPLOY.md",
+      "V2_*.md",
+      "uploads/**",
+      "post-admin.html",
+      "firestore.rules",
+      "storage.rules"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|html)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

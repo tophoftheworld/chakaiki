@@ -1,0 +1,47 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Replace with founder Firebase Auth UID after running migrate-owner-ids.mjs
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid in ['FOUNDER_UID_PLACEHOLDER'];
+    }
+
+    function isImageUpload() {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    match /logs/{logId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && isImageUpload();
+    }
+
+    match /profiles/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && isImageUpload();
+    }
+
+    match /events/{eventId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && isImageUpload();
+    }
+
+    match /lists/{listId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && isImageUpload();
+    }
+
+    match /brandLogos/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImageUpload();
+    }
+
+    match /placePhotos/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null && isImageUpload();
+    }
+  }
+}

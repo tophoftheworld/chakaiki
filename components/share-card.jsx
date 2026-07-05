@@ -141,6 +141,13 @@ function getNonZeroScales(scales, profile, limit) {
   return scales.filter(({ key }) => Number(profile?.[key]) > 0).slice(0, limit);
 }
 
+const SHARE_BAR_LABEL_GAP = 18;
+const SHARE_BAR_ROW_GAP = 28;
+
+function shareBarRowHeight(barH = 8) {
+  return SHARE_BAR_LABEL_GAP + barH + SHARE_BAR_ROW_GAP;
+}
+
 function drawMiniBarCentered(ctx, cx, y, barW, label, value, barH = 8) {
   const val = Math.min(5, Math.max(0, Number(value) || 0));
   setShareFont(ctx, 22, '500');
@@ -149,7 +156,7 @@ function drawMiniBarCentered(ctx, cx, y, barW, label, value, barH = 8) {
   ctx.fillText(label, cx, y);
   ctx.textAlign = 'left';
   const x = cx - barW / 2;
-  const barY = y + 10;
+  const barY = y + SHARE_BAR_LABEL_GAP;
   ctx.fillStyle = 'rgba(255,255,255,0.25)';
   shareRoundRect(ctx, x, barY, barW, barH, barH / 2);
   ctx.fill();
@@ -158,7 +165,7 @@ function drawMiniBarCentered(ctx, cx, y, barW, label, value, barH = 8) {
     shareRoundRect(ctx, x, barY, barW * (val / 5), barH, barH / 2);
     ctx.fill();
   }
-  return barY + barH + 18;
+  return barY + barH + SHARE_BAR_ROW_GAP;
 }
 
 function drawTagPillsCentered(ctx, tags, cx, y, maxW) {
@@ -231,7 +238,7 @@ function drawBrandBlock(ctx, w, h, safe, data, fields, topY, style = {}) {
   const drawLogo = () => {
     if (!fields.watermark) return;
     drawChakaikiWordmarkCentered(ctx, safe.cx, y + wmSize, wmSize, wmAlpha);
-    y += wmSize + 14;
+    y += wmSize + 18;
   };
   const drawHandle = () => {
     if (!fields.username || !data.handle) return;
@@ -255,7 +262,7 @@ function drawBrandBlock(ctx, w, h, safe, data, fields, topY, style = {}) {
     }
     drawCenteredText(ctx, data.handle, safe.cx, y + handleSize, maxW, handleColor);
     ctx.shadowBlur = 0;
-    y += handleSize + 10;
+    y += handleSize + 14;
   };
 
   if (stack === 'handle-first') {
@@ -279,7 +286,7 @@ function drawDetailsBlock(ctx, w, h, safe, data, fields, topY, layoutId) {
     if (fields.drinkName && data.drinkName) panelH += 48;
     if (fields.brand && data.brand) panelH += 36;
     if (fields.flavorTags && data.flavorTags.length) panelH += 48;
-    if (fields.matchaBars) panelH += getNonZeroScales(MATCHA_PROFILE_SCALES, data.profile, 3).length * 38;
+    if (fields.matchaBars) panelH += getNonZeroScales(MATCHA_PROFILE_SCALES, data.profile, 3).length * shareBarRowHeight(7);
     if (fields.caption && data.captionExcerpt) panelH += 40;
     panelH = Math.min(panelH, h - topY - 120);
     const panelX = safe.x + innerPad / 2;
@@ -291,17 +298,18 @@ function drawDetailsBlock(ctx, w, h, safe, data, fields, topY, layoutId) {
     if (fields.drinkName && data.drinkName) {
       setShareFont(ctx, 36, '700');
       drawCenteredText(ctx, data.drinkName, safe.cx, y, innerMaxW, '#ffffff');
-      y += 44;
+      y += 48;
     }
     if (fields.brand && data.brand) {
       setShareFont(ctx, 26, '600');
       drawCenteredText(ctx, data.brand, safe.cx, y, innerMaxW, 'rgba(255,255,255,0.9)');
-      y += 34;
+      y += 40;
     }
     if (fields.flavorTags && data.flavorTags.length) {
       y = drawTagPillsCentered(ctx, data.flavorTags, safe.cx, y + 8, innerMaxW) + 4;
     }
     if (fields.matchaBars) {
+      y += 6;
       getNonZeroScales(MATCHA_PROFILE_SCALES, data.profile, 3).forEach(({ key, label }) => {
         y = drawMiniBarCentered(ctx, safe.cx, y, innerMaxW * 0.88, label, data.profile[key], 7);
       });
@@ -337,16 +345,17 @@ function drawDetailsBlock(ctx, w, h, safe, data, fields, topY, layoutId) {
     if (fields.drinkName && data.drinkName) {
       setShareFont(ctx, 38, '700');
       drawCenteredText(ctx, data.drinkName, safe.cx, y + 38, maxW, '#ffffff');
-      y += 50;
+      y += 58;
     }
     if (fields.brand && data.brand) {
       setShareFont(ctx, 28, '600');
       drawCenteredText(ctx, data.brand, safe.cx, y + 28, maxW, 'rgba(255,255,255,0.9)');
-      y += 40;
+      y += 48;
     }
     if (fields.drinkBars) {
+      y += 8;
       getNonZeroScales(DRINK_PROFILE_SCALES, data.profile, 3).forEach(({ key, label }) => {
-        y = drawMiniBarCentered(ctx, safe.cx, y + 4, safe.w * 0.78, label, data.profile[key]);
+        y = drawMiniBarCentered(ctx, safe.cx, y, safe.w * 0.78, label, data.profile[key]);
       });
     }
     return y;
@@ -356,12 +365,12 @@ function drawDetailsBlock(ctx, w, h, safe, data, fields, topY, layoutId) {
   if (fields.drinkName && data.drinkName) {
     setShareFont(ctx, 40, '700');
     drawCenteredText(ctx, data.drinkName, safe.cx, y + 40, maxW, '#ffffff');
-    y += 52;
+    y += 58;
   }
   if (fields.brand && data.brand) {
     setShareFont(ctx, 30, '600');
     drawCenteredText(ctx, data.brand, safe.cx, y + 30, maxW, 'rgba(255,255,255,0.92)');
-    y += 42;
+    y += 48;
   }
   return y;
 }

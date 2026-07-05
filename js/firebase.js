@@ -7,8 +7,12 @@
 let firestore = null;
 let storage = null;
 
+/** Legacy owner id before anonymous UID bridge — used by migration scripts only. */
+export const LEGACY_OWNER_ID = 'matchaontoph';
+
+/** @deprecated Runtime identity uses anonymous auth UID. Kept for migration reference. */
 export const HARDCODED_PROFILE = {
-  ownerId: 'matchaontoph',
+  ownerId: LEGACY_OWNER_ID,
   name: 'Cristopher David',
   username: '@matchaontoph',
 };
@@ -60,14 +64,24 @@ let _currentUserId = null;
 let _authInitPromise = null;
 let _authDisabled = false;
 
-function skipAnonymousAuthByConfig() {
+export function skipAnonymousAuthByConfig() {
   return typeof window !== 'undefined' && (
     window.CHAKAIKI_SKIP_ANONYMOUS_AUTH === true
     || window.MATCHA_HOP_SKIP_ANONYMOUS_AUTH === true
   );
 }
 
-/** Initialize anonymous auth so we have a stable userId for likes. Call after initFirebase. */
+function syncCurrentUserIdFromAuth() {
+  const firebase = typeof window !== 'undefined' ? window.firebase : null;
+  const user = firebase?.auth?.()?.currentUser;
+  if (user?.uid) {
+    _currentUserId = user.uid;
+    return _currentUserId;
+  }
+  return _currentUserId;
+}
+
+/** Initialize anonymous auth so we have a stable userId. Call after initFirebase. */
 export function initAuth() {
   if (skipAnonymousAuthByConfig()) {
     return Promise.resolve(null);
@@ -99,11 +113,33 @@ export function initAuth() {
   return _authInitPromise;
 }
 
-/** Current user id for likes (anonymous auth). Returns null if auth not available. */
+/** Current Firebase Auth uid (anonymous). Returns null if auth not available. */
 export function getCurrentUserId() {
-  return HARDCODED_PROFILE.ownerId;
+  return syncCurrentUserIdFromAuth() || null;
 }
 
+/** Base profile for the signed-in user (display fields enriched async in bootstrap). */
 export function getCurrentProfile() {
-  return { ...HARDCODED_PROFILE };
+  const uid = getCurrentUserId();
+  if (!uid) {
+    return {
+      ownerId: '',
+      name: 'Member',
+      username: '@member',
+    };
+  }
+  return {
+    ownerId: uid,
+    name: 'Member',
+    username: '@member',
+  };
+}
+
+/** Throws if anonymous auth did not produce a uid. */
+export function requireAuthUserId() {
+  const uid = getCurrentUserId();
+  if (!uid) {
+    throw new Error('Sign-in required. Enable Anonymous Auth in Firebase Console and reload.');
+  }
+  return uid;
 }

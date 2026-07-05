@@ -617,11 +617,12 @@ async function syncLogToFirestore(entry) {
   }
 }
 
-export function saveLog(log) {
+export async function saveLog(log) {
   const id = docId(log.id || uid());
   const existing = _logs.find((l) => docId(l.id) === id);
   const profile = getCurrentProfile();
   const userId = profile.ownerId;
+  if (!userId) throw new Error('Sign-in required to save posts.');
   const inputPost = log.post || {};
   const photos = Array.isArray(inputPost.photos) && inputPost.photos.length > 0
     ? inputPost.photos
@@ -661,16 +662,16 @@ export function saveLog(log) {
     updatedAt: Date.now(),
   });
   assertStrictLogShape(entry);
+  await syncLogToFirestore(entry);
   const idx = _logs.findIndex((l) => l.id === id);
   if (idx >= 0) _logs[idx] = entry;
   else _logs.push(entry);
-  putIDB(STORE_LOGS, entry).catch((e) => console.error('saveLog IDB', e));
-  return syncLogToFirestore(entry).then(
-    () => entry,
-    (e) => {
-      throw e;
-    }
-  );
+  try {
+    await putIDB(STORE_LOGS, entry);
+  } catch (e) {
+    console.error('saveLog IDB', e);
+  }
+  return entry;
 }
 
 /** Delete a log by id from memory, IDB, and Firestore. */
@@ -1386,7 +1387,8 @@ function dateKeyFromRaw(v) {
 function buildEventDoc(payload, { published }) {
   const id = String(payload?.id || '').trim() || uid();
   const profile = getCurrentProfile();
-  const handle = String(profile?.username || '').replace(/^@/, '') || 'member';
+  const ownerId = String(getCurrentUserId() || profile?.ownerId || '').trim();
+  if (!ownerId) throw new Error('Sign-in required to create events.');
   const type = ['popup', 'workshop', 'fest', 'crawl', 'meetup'].includes(payload?.type) ? payload.type : 'fest';
   let title = String(payload?.title || '').trim();
   const subtitle = String(payload?.subtitle || '').trim();
@@ -1423,7 +1425,7 @@ function buildEventDoc(payload, { published }) {
     coverPhoto: payload?.coverPhoto != null ? String(payload.coverPhoto) : null,
     coverHue: Number(payload?.coverHue) || 120,
     status: published ? 'upcoming' : 'pending',
-    submittedBy: handle,
+    submittedBy: ownerId,
     published,
     createdAt: Date.now(),
   };

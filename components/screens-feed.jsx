@@ -824,11 +824,13 @@ function commentRowFromFirestore(c) {
 }
 
 function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
-  const post = POSTS.find(p => p.id === postId) || POSTS[0];
-  const brand = BRANDS.find((b) => b.id === post.brandId) || null;
+  const post = POSTS.find((p) => p.id === postId) || null;
+  const brand = post ? (BRANDS.find((b) => b.id === post.brandId) || null) : null;
   const [comments, setComments] = React.useState([]);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [draft, setDraft] = React.useState('');
+  const [commentError, setCommentError] = React.useState('');
+  const [deleteError, setDeleteError] = React.useState('');
   const commentsEndRef = React.useRef(null);
   const [brandCardPhotoExtra, setBrandCardPhotoExtra] = React.useState(null);
   const [postMenuOpen, setPostMenuOpen] = React.useState(false);
@@ -884,6 +886,7 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
 
   React.useEffect(() => {
     setBrandCardPhotoExtra(null);
+    if (!post) return;
     const b = BRANDS.find((x) => x.id === post.brandId);
     if (!b) return;
     if (brandCardPhotoSync(b, post)) return;
@@ -897,7 +900,7 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [post.id, post.branchId, post.brandId]);
+  }, [post?.id, post?.branchId, post?.brandId]);
 
   React.useEffect(() => {
     let active = true;
@@ -924,7 +927,8 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
   const onSubmitComment = async (e) => {
     e?.preventDefault?.();
     const val = String(draft || '').trim();
-    if (!val) return;
+    if (!val || !post) return;
+    setCommentError('');
     const optimistic = { id: `temp-${Date.now()}`, author: 'you', text: val, createdAt: Date.now() };
     setDraft('');
     setComments((prev) => [...prev.filter((c) => !String(c.id || '').startsWith('temp-')), optimistic]);
@@ -934,8 +938,9 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
       const list = Array.isArray(fetched) ? fetched : [];
       setComments(list.map(commentRowFromFirestore).filter(Boolean));
       await window.V2Live?.refreshPostEngagement?.(postId);
-    } catch {
-      // Keep optimistic row if save failed; user can retry.
+    } catch (err) {
+      setComments((prev) => prev.filter((c) => !String(c.id || '').startsWith('temp-')));
+      setCommentError(err?.message || 'Could not post comment. Please try again.');
     }
   };
 
@@ -948,14 +953,35 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
 
   const onDeletePost = async () => {
     if (!post?.isOwn) return;
+    setDeleteError('');
     try {
       if (window.V2Live?.deletePost) await window.V2Live.deletePost(post.id);
       setDeleteConfirmOpen(false);
       onBack();
-    } catch {
-      // ignore
+    } catch (err) {
+      setDeleteError(err?.message || 'Could not delete post. Please try again.');
     }
   };
+
+  if (!post) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: theme.surface }}>
+        <div style={{ padding: 'max(12px, env(safe-area-inset-top, 0px)) 16px 12px', borderBottom: `1px solid ${theme.border}`, flexShrink: 0 }}>
+          <button type="button" onClick={onBack} style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer' }}>
+            <IconBack size={20} stroke={theme.text} sw={2} />
+          </button>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ textAlign: 'center', maxWidth: 280 }}>
+            <div style={{ fontFamily: theme.sans, fontSize: 17, fontWeight: 700, color: theme.text }}>Post not found</div>
+            <div style={{ fontFamily: theme.sans, fontSize: 14, color: theme.muted, marginTop: 8, lineHeight: 1.45 }}>
+              It may have been removed or the link is invalid.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const userLine = postAuthorUserLabel(post);
   const locationLine = getPostLocationSecondLine(post);
@@ -1126,6 +1152,9 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
             <div style={{ fontFamily: theme.sans, fontSize: 14, color: theme.muted, lineHeight: 1.45, marginBottom: 18 }}>
               This cannot be undone.
             </div>
+            {deleteError ? (
+              <div style={{ fontFamily: theme.sans, fontSize: 13, color: '#c0392b', marginBottom: 12, lineHeight: 1.4 }}>{deleteError}</div>
+            ) : null}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
                 type="button"
@@ -1330,6 +1359,10 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
               </div>
             ))}
           </div>
+
+          {commentError ? (
+            <div style={{ fontFamily: theme.sans, fontSize: 13, color: '#c0392b', marginBottom: 8, lineHeight: 1.4 }}>{commentError}</div>
+          ) : null}
 
           <form onSubmit={onSubmitComment} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', paddingTop: 2 }}>
             <input

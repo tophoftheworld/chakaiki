@@ -96,13 +96,21 @@
     function showFatal(message) {
       var root = document.getElementById('root');
       if (!root) return;
-      root.innerHTML =
-        '<div style="height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;background:#fff;color:#0a0a0a;">' +
-          '<div style="max-width:340px;text-align:center;">' +
-            '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">Chakaiki cannot load</div>' +
-            '<div style="font-size:14px;line-height:1.5;color:#737373;">' + message + '</div>' +
-          '</div>' +
-        '</div>';
+      root.replaceChildren();
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;background:#fff;color:#0a0a0a;';
+      var inner = document.createElement('div');
+      inner.style.cssText = 'max-width:340px;text-align:center;';
+      var title = document.createElement('div');
+      title.style.cssText = 'font-size:18px;font-weight:700;margin-bottom:8px;';
+      title.textContent = 'Chakaiki cannot load';
+      var body = document.createElement('div');
+      body.style.cssText = 'font-size:14px;line-height:1.5;color:#737373;';
+      body.textContent = String(message || '');
+      inner.appendChild(title);
+      inner.appendChild(body);
+      wrap.appendChild(inner);
+      root.appendChild(wrap);
     }
     function runtimeReady() {
       return Boolean(window.React && window.ReactDOM);

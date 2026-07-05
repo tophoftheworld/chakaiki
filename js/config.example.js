@@ -14,5 +14,5 @@ window.FIREBASE_CONFIG = {
   appId: '1:000000000000:web:0000000000000000000000',
 };
 
-/** Skip anonymous Firebase auth for faster startup. Set false if Storage rules require auth. */
-window.CHAKAIKI_SKIP_ANONYMOUS_AUTH = true;
+/** Anonymous sign-in before Storage uploads (required when storage.rules use request.auth). */
+window.CHAKAIKI_SKIP_ANONYMOUS_AUTH = false;

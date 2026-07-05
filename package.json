@@ -2,6 +2,9 @@
   "name": "chakaiki",
   "private": true,
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "migrate:firestore": "node scripts/migrate-firestore.mjs",
+    "migrate:firestore:dry": "node scripts/migrate-firestore.mjs --dry-run",
+    "migrate:owner-ids": "node scripts/migrate-owner-ids.mjs"
   }
 }

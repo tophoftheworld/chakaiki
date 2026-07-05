@@ -3,7 +3,7 @@
  * getCachedPlaceDetails / setCachedPlaceDetails use Firestore; uploadPlacePhoto stores image in Storage and returns URL.
  */
 
-import { getDb, getStorage, PLACE_DETAILS_COLLECTION } from './firebase.js';
+import { getDb, getStorage, initAuth, PLACE_DETAILS_COLLECTION } from './firebase.js';
 
 /** Firestore doc IDs cannot contain "/"; use a safe key for placeDetails so read/write match. */
 export function safePlaceIdPath(placeId) {
@@ -78,6 +78,7 @@ export async function uploadPlacePhoto(placeId, imageBlob) {
   if (!path) return null;
   const pathWithExt = `placePhotos/${path}.jpg`;
   try {
+    await initAuth();
     const ref = st.ref(pathWithExt);
     await ref.put(imageBlob, { contentType: imageBlob.type || 'image/jpeg' });
     const url = await ref.getDownloadURL();

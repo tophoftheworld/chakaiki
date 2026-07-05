@@ -1,77 +1,145 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isStrictLogV3(data) {
-      return data.schemaVersion == 3
-        && data.userId is string
-        && data.userName is string
-        && data.createdAt is number
-        && data.updatedAt is number
-        && data.visit is map
-        && data.visit.brandId is string
-        && data.visit.brandName is string
-        && data.visit.location is map
-        && ((data.visit.location.cafeId is string) || (data.visit.location.popupId is string))
-        && data.post is map
-        && data.post.caption is string
-        && data.post.rating is number
-        && data.post.drinks is list
-        && data.post.drinks.size() > 0;
-    }
+  // Replace with founder Firebase Auth UID after running migrate-owner-ids.mjs
+  function isAdmin() {
+    return request.auth != null
+      && request.auth.uid in ['FOUNDER_UID_PLACEHOLDER'];
+  }
 
-    function isLogComment(data) {
-      return data.logId is string
-        && data.authorId is string
-        && data.authorName is string
-        && data.text is string
-        && data.createdAt is number
-        && data.updatedAt is number;
-    }
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    function hasValidCafeMeta(data) {
-      return (!('locationTags' in data) || data.locationTags is list)
-        && (!('hoursOverride' in data) || data.hoursOverride is string || data.hoursOverride == null);
-    }
+  function hasValidLogLocation(loc) {
+    return loc is map
+      && (
+        (loc.cafeId is string)
+        || (loc.popupId is string)
+        || (loc.eventId is string)
+        || loc.popupGeneric == true
+      );
+  }
 
-    match /cafes/{cafeId} {
-      allow read: if true;
-      allow write: if hasValidCafeMeta(request.resource.data);
-    }
-    match /logs/{logId} {
-      allow read: if true;
-      allow create, update: if isStrictLogV3(request.resource.data);
-      allow delete: if true;
-    }
-    match /logComments/{commentId} {
-      allow read: if true;
-      allow create, update: if isLogComment(request.resource.data);
-    }
-    match /settings/{docId} {
-      allow read, write: if true;
-    }
-    match /brandPopUps/{popUpId} {
-      allow read, write: if true;
-    }
-    match /brandLikes/{brandId} {
-      allow read, write: if true;
-    }
-    match /locationLikes/{locationId} {
-      allow read, write: if true;
-    }
-    match /logPostLikes/{logId} {
-      allow read, write: if true;
-    }
-    match /placeDetails/{placeId} {
-      allow read, write: if true;
-    }
-    match /events/{eventId} {
-      allow read, write: if true;
-    }
-    match /lists/{listId} {
-      allow read, write: if true;
-    }
-    match /userProfiles/{profileId} {
-      allow read, write: if true;
-    }
+  function isStrictLogV3(data) {
+    return data.schemaVersion == 3
+      && data.userId is string
+      && data.userName is string
+      && data.createdAt is number
+      && data.updatedAt is number
+      && data.visit is map
+      && data.visit.brandId is string
+      && data.visit.brandName is string
+      && data.visit.location is map
+      && hasValidLogLocation(data.visit.location)
+      && data.post is map
+      && data.post.caption is string
+      && data.post.rating is number
+      && data.post.drinks is list
+      && (
+        data.post.drinks.size() > 0
+        || (data.post.caption is string && data.post.caption.size() > 0)
+      );
+  }
+
+  function isLogComment(data) {
+    return data.logId is string
+      && data.authorId is string
+      && data.authorName is string
+      && data.text is string
+      && data.createdAt is number
+      && data.updatedAt is number;
+  }
+
+  function hasValidCafeMeta(data) {
+    return (!('locationTags' in data) || data.locationTags is list)
+      && (!('hoursOverride' in data) || data.hoursOverride is string || data.hoursOverride == null);
+  }
+
+  function isLikeDoc(data) {
+    return data.count is int && data.userIds is list;
+  }
+
+  match /cafes/{cafeId} {
+    allow read: if true;
+    allow write: if isSignedIn() && hasValidCafeMeta(request.resource.data);
+  }
+
+  match /logs/{logId} {
+    allow read: if true;
+    allow create: if isSignedIn()
+      && isStrictLogV3(request.resource.data)
+      && request.resource.data.userId == request.auth.uid;
+    allow update: if isSignedIn()
+      && isStrictLogV3(request.resource.data)
+      && resource.data.userId == request.auth.uid
+      && request.resource.data.userId == resource.data.userId;
+    allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+  }
+
+  match /logComments/{commentId} {
+    allow read: if true;
+    allow create: if isSignedIn()
+      && isLogComment(request.resource.data)
+      && request.resource.data.authorId == request.auth.uid;
+    allow update: if isSignedIn()
+      && isLogComment(request.resource.data)
+      && resource.data.authorId == request.auth.uid
+      && request.resource.data.authorId == resource.data.authorId;
+  }
+
+  match /settings/{docId} {
+    allow read: if true;
+    allow write: if isSignedIn() && (docId != 'brands' || isAdmin());
+  }
+
+  match /brandPopUps/{popUpId} {
+    allow read: if true;
+    allow write: if isSignedIn();
+  }
+
+  match /brandLikes/{brandId} {
+    allow read: if true;
+    allow write: if isSignedIn() && isLikeDoc(request.resource.data);
+  }
+
+  match /locationLikes/{locationId} {
+    allow read: if true;
+    allow write: if isSignedIn() && isLikeDoc(request.resource.data);
+  }
+
+  match /logPostLikes/{logId} {
+    allow read: if true;
+    allow write: if isSignedIn() && isLikeDoc(request.resource.data);
+  }
+
+  match /placeDetails/{placeId} {
+    allow read: if true;
+    allow write: if isSignedIn();
+  }
+
+  match /events/{eventId} {
+    allow read: if true;
+    allow create: if isSignedIn()
+      && request.resource.data.submittedBy == request.auth.uid;
+    allow update, delete: if isSignedIn()
+      && resource.data.submittedBy == request.auth.uid;
+  }
+
+  match /lists/{listId} {
+    allow read: if true;
+    allow create: if isSignedIn()
+      && request.resource.data.ownerId == request.auth.uid;
+    allow update, delete: if isSignedIn()
+      && resource.data.ownerId == request.auth.uid;
+  }
+
+  match /userProfiles/{profileId} {
+    allow read: if true;
+    allow create, update: if isSignedIn()
+      && profileId == request.auth.uid
+      && request.resource.data.ownerId == request.auth.uid;
+    allow delete: if isSignedIn() && profileId == request.auth.uid;
+  }
   }
 }
