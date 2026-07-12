@@ -653,13 +653,18 @@ function FeedScreen({ theme, onOpenPost, onOpenBrand, brandFilterId = null, onBa
 
   const mixedItems = [];
   if (!brandFilterId && USER_LISTS.length > 0 && onOpenList) {
+    let nextListIdx = 0;
     feedPosts.forEach((post, i) => {
       mixedItems.push({ kind: 'post', post });
-      if ((i + 1) % 2 === 0 && USER_LISTS.length) {
-        const listIdx = Math.floor(i / 2) % USER_LISTS.length;
-        mixedItems.push({ kind: 'list', list: USER_LISTS[listIdx] });
+      if ((i + 1) % 2 === 0 && nextListIdx < USER_LISTS.length) {
+        mixedItems.push({ kind: 'list', list: USER_LISTS[nextListIdx] });
+        nextListIdx += 1;
       }
     });
+    while (nextListIdx < USER_LISTS.length) {
+      mixedItems.push({ kind: 'list', list: USER_LISTS[nextListIdx] });
+      nextListIdx += 1;
+    }
   } else {
     feedPosts.forEach((post) => mixedItems.push({ kind: 'post', post }));
   }
