@@ -73,7 +73,10 @@ export function skipAnonymousAuthByConfig() {
 
 function syncCurrentUserIdFromAuth() {
   const firebase = typeof window !== 'undefined' ? window.firebase : null;
-  const user = firebase?.auth?.()?.currentUser;
+  // Do not touch firebase.auth() before an app is initialized — it throws
+  // "No Firebase App '[DEFAULT]' has been created" (e.g. during first render).
+  if (!firebase?.auth || !firebase.apps?.length) return _currentUserId;
+  const user = firebase.auth().currentUser;
   if (user?.uid) {
     _currentUserId = user.uid;
     return _currentUserId;
@@ -90,6 +93,9 @@ export function initAuth() {
   if (_authInitPromise) return _authInitPromise;
   const firebase = typeof window !== 'undefined' ? window.firebase : null;
   if (!firebase?.auth) return Promise.resolve(null);
+  // Ensure the Firebase app exists before touching auth services.
+  if (!firebase.apps?.length) initFirebase();
+  if (!firebase.apps?.length) return Promise.resolve(null);
   const auth = firebase.auth();
   if (auth.currentUser) {
     _currentUserId = auth.currentUser.uid;
