@@ -1,5 +1,5 @@
-import * as DataMod from './js/data.js?v=20260614g';
-import * as FirebaseMod from './js/firebase.js?v=20260614g';
+import * as DataMod from './js/data.js?v=20260804a';
+import * as FirebaseMod from './js/firebase.js?v=20260804a';
 
 const getCurrentProfile = FirebaseMod.getCurrentProfile;
 const getStorage = FirebaseMod.getStorage;
@@ -7,6 +7,11 @@ const initAuth = FirebaseMod.initAuth;
 const getDb = FirebaseMod.getDb;
 const getCurrentUserId = FirebaseMod.getCurrentUserId;
 const requireAuthUserId = FirebaseMod.requireAuthUserId;
+const requireContributorAuth = FirebaseMod.requireContributorAuth;
+const isRealUser = FirebaseMod.isRealUser;
+const signInWithGoogle = FirebaseMod.signInWithGoogle;
+const signOutUser = FirebaseMod.signOutUser;
+const handleRedirectResult = FirebaseMod.handleRedirectResult;
 const skipAnonymousAuthByConfig = FirebaseMod.skipAnonymousAuthByConfig;
 const USER_PROFILES_COLLECTION = FirebaseMod.USER_PROFILES_COLLECTION || 'userProfiles';
 /** Bind data.js exports without static named imports (stale CDN cache must not brick boot). */
@@ -877,6 +882,74 @@ function assertV2Firestore() {
   }
 }
 
+function assertContributor() {
+  requireContributorAuth();
+}
+
+let _signInRequestResolver = null;
+
+function requestSignInSheet() {
+  return new Promise((resolve) => {
+    if (_signInRequestResolver) {
+      try { _signInRequestResolver(false); } catch (_) {}
+    }
+    _signInRequestResolver = resolve;
+    try {
+      window.dispatchEvent(new CustomEvent('v2:request-signin'));
+    } catch (_) {
+      _signInRequestResolver = null;
+      resolve(false);
+    }
+  });
+}
+
+function completeSignInRequest(ok) {
+  if (!_signInRequestResolver) return;
+  const resolve = _signInRequestResolver;
+  _signInRequestResolver = null;
+  try { resolve(Boolean(ok)); } catch (_) {}
+}
+
+async function seedProfileFromAuthUser(user) {
+  const uid = String(user?.uid || getCurrentUserId() || '').trim();
+  if (!uid) return null;
+  const existing = await v2GetUserProfile(uid).catch(() => null);
+  const patch = {};
+  if (!existing?.displayName) {
+    const name = String(user?.displayName || '').trim();
+    if (name) patch.displayName = name;
+  }
+  if (!existing?.username) {
+    const base = getCurrentProfile();
+    const handle = String(base?.username || '').replace(/^@/, '').trim();
+    if (handle && handle !== 'member') patch.username = handle;
+  }
+  if (!existing?.avatarUrl && user?.photoURL) {
+    patch.avatarUrl = String(user.photoURL);
+  }
+  if (Object.keys(patch).length === 0) {
+    cachedUserProfile = existing;
+    return existing;
+  }
+  cachedUserProfile = await v2UpsertUserProfile(uid, patch);
+  return cachedUserProfile;
+}
+
+async function afterAuthUpgrade(user) {
+  try {
+    await seedProfileFromAuthUser(user || null);
+  } catch (e) {
+    console.warn('[v2] seed profile after sign-in failed:', e?.message || e);
+  }
+  window.dispatchEvent(new Event('v2:profile-updated'));
+  window.dispatchEvent(new Event('v2:auth-changed'));
+  try {
+    await refreshV2Data();
+  } catch (e) {
+    console.warn('[v2] refresh after sign-in failed:', e?.message || e);
+  }
+}
+
 async function buildListEntriesForSave(listId, rawEntries) {
   const entries = [];
   for (let i = 0; i < rawEntries.length; i += 1) {
@@ -992,7 +1065,10 @@ function mergeV2Profile(baseProf, extra) {
     username: uname.startsWith('@') ? uname : `@${handle}`,
     handle,
     avatarInitial: initial,
-    avatarUrl: e.avatarUrl || null,
+    avatarUrl: e.avatarUrl || p.photoURL || null,
+    email: p.email || '',
+    isAnonymous: Boolean(p.isAnonymous),
+    isRealUser: Boolean(p.ownerId && p.isAnonymous === false),
     instagram,
     instagramUrl,
   };
@@ -1060,15 +1136,50 @@ window.V2Live = {
   getProfile() {
     return mergeV2Profile(getCurrentProfile(), cachedUserProfile);
   },
+  isRealUser() {
+    return Boolean(isRealUser?.());
+  },
+  completeSignInRequest,
+  async signInWithGoogle() {
+    await initData();
+    assertV2Firestore();
+    const user = await signInWithGoogle();
+    if (user) await afterAuthUpgrade(user);
+    return Boolean(isRealUser());
+  },
+  async signOut() {
+    await signOutUser();
+    cachedUserProfile = null;
+    window.dispatchEvent(new Event('v2:profile-updated'));
+    window.dispatchEvent(new Event('v2:auth-changed'));
+    try {
+      await refreshV2Data();
+    } catch (e) {
+      console.warn('[v2] refresh after sign-out failed:', e?.message || e);
+    }
+  },
+  /** Returns true if the user can contribute. Otherwise opens the Google sign-in sheet. */
+  async ensureContributor() {
+    if (isRealUser()) return true;
+    const ok = await requestSignInSheet();
+    return Boolean(ok && isRealUser());
+  },
   async updateProfile(payload) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     const base = getCurrentProfile();
     const oid = String(base?.ownerId || '').trim();
     if (!oid) throw new Error('Profile owner id required');
     const patch = {};
     if (payload?.instagram != null) {
       patch.instagram = String(payload.instagram).trim().replace(/^@/, '');
+    }
+    if (payload?.displayName != null) {
+      patch.displayName = String(payload.displayName).trim();
+    }
+    if (payload?.username != null) {
+      patch.username = String(payload.username).trim().replace(/^@/, '');
     }
     if (payload?.avatarFile) {
       const urls = await uploadPhotoFiles(oid, [payload.avatarFile], {
@@ -1088,6 +1199,7 @@ window.V2Live = {
     const { coverPhotoFile, ...rest } = payload || {};
     await initData();
     assertV2Firestore();
+    assertContributor();
     const eventId = `ev_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     let coverPhoto = rest.coverPhoto || null;
     if (coverPhotoFile) {
@@ -1106,6 +1218,7 @@ window.V2Live = {
     const { coverPhotoFile, keepCoverPhoto, ...rest } = payload || {};
     await initData();
     assertV2Firestore();
+    assertContributor();
     const id = String(eventId || '').trim();
     if (!id) throw new Error('Event id required');
     await assertEventOwner(id);
@@ -1126,6 +1239,7 @@ window.V2Live = {
   async deleteEvent(eventId) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     await assertEventOwner(eventId);
     await persistDeleteEvent(eventId);
     await refreshV2Data();
@@ -1139,6 +1253,7 @@ window.V2Live = {
   async createList(payload) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     const oid = getCurrentUserId();
     if (!oid) throw new Error('User id required');
     const { entries: rawEntries = [], ...rest } = payload || {};
@@ -1151,6 +1266,7 @@ window.V2Live = {
   async updateList(listId, payload) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     const id = String(listId || '').trim();
     if (!id) throw new Error('List id required');
     assertListOwner(id);
@@ -1165,6 +1281,7 @@ window.V2Live = {
   async deleteList(listId) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     assertListOwner(listId);
     await persistDeleteList(listId);
     await refreshV2Data();
@@ -1209,6 +1326,7 @@ window.V2Live = {
     async add(logId, text) {
       await initData();
       assertV2Firestore();
+      assertContributor();
       await addLogComment(logId, text);
     },
   },
@@ -1332,6 +1450,7 @@ window.V2Live = {
   async deletePost(postId) {
     await initData();
     assertV2Firestore();
+    assertContributor();
     if (!postId) return;
     const me = String(getCurrentUserId() || '');
     const existing = (getLogs() || []).find((l) => String(l.id) === String(postId));
@@ -1828,7 +1947,8 @@ window.V2Live = {
   async savePost(payload) {
     await initData();
     assertV2Firestore();
-    const profile = getCurrentProfile();
+    assertContributor();
+    const profile = mergeV2Profile(getCurrentProfile(), cachedUserProfile);
     const existingPostId = payload?.postId ? String(payload.postId).trim() : '';
     const isUpdate = Boolean(existingPostId);
     const logId = isUpdate
@@ -1906,7 +2026,7 @@ window.V2Live = {
       id: logId,
       userId: profile.ownerId,
       userName: profile.username,
-      userDisplayName: profile.name,
+      userDisplayName: profile.displayName,
       createdAt: isUpdate ? (Number(payload.createdAt) || undefined) : Date.now(),
       visit: {
         brandId: selectedBrand.id,
@@ -1935,6 +2055,16 @@ async function runV2Bootstrap() {
   if (window.__V2_FATAL__) {
     window.dispatchEvent(new CustomEvent('v2:bootstrap-error', { detail: window.__V2_FATAL__ }));
     return;
+  }
+  try {
+    const redirected = await handleRedirectResult?.();
+    if (redirected) {
+      try { await seedProfileFromAuthUser(redirected); } catch (_) {}
+      window.dispatchEvent(new Event('v2:profile-updated'));
+      window.dispatchEvent(new Event('v2:auth-changed'));
+    }
+  } catch (e) {
+    console.warn('[v2] handleRedirectResult failed:', e?.message || e);
   }
   if (typeof window.setV2Data === 'function') {
     window.setV2Data({ brands: [], posts: [] });

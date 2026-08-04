@@ -52,15 +52,21 @@ function EditProfileSheet({ theme, profile, onClose, onSaved }) {
 function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }) {
   const [activeTab, setActiveTab] = React.useState('posts');
   const [showEdit, setShowEdit] = React.useState(false);
+  const [showSignIn, setShowSignIn] = React.useState(false);
   const [avatarUploading, setAvatarUploading] = React.useState(false);
   const [avatarError, setAvatarError] = React.useState('');
+  const [authBusy, setAuthBusy] = React.useState(false);
   const [, setTick] = React.useState(0);
   const avatarInputRef = React.useRef(null);
 
   React.useEffect(() => {
     const h = () => setTick((t) => t + 1);
     window.addEventListener('v2:profile-updated', h);
-    return () => window.removeEventListener('v2:profile-updated', h);
+    window.addEventListener('v2:auth-changed', h);
+    return () => {
+      window.removeEventListener('v2:profile-updated', h);
+      window.removeEventListener('v2:auth-changed', h);
+    };
   }, []);
 
   const profile = window.V2Live?.getProfile?.() || {
@@ -68,12 +74,18 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
     handle: 'member',
     avatarInitial: '?',
   };
+  const signedIn = Boolean(window.V2Live?.isRealUser?.() || profile.isRealUser);
+  const SignInSheet = window.SignInSheet;
   const POSTS = Array.isArray(window.POSTS) ? window.POSTS : [];
   const myPosts = POSTS.filter((p) => p.isOwn);
   const memberLine = `${myPosts.length} post${myPosts.length !== 1 ? 's' : ''}`;
 
   const onAvatarPick = async (file) => {
     if (!file || !window.V2Live?.updateProfile || avatarUploading) return;
+    if (!signedIn) {
+      setShowSignIn(true);
+      return;
+    }
     setAvatarError('');
     setAvatarUploading(true);
     try {
@@ -85,6 +97,18 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
     }
   };
 
+  const onSignOut = async () => {
+    if (authBusy || !window.V2Live?.signOut) return;
+    setAuthBusy(true);
+    try {
+      await window.V2Live.signOut();
+    } catch (e) {
+      window.alert(e?.message || 'Could not sign out');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 80, background: theme.surface, display: 'flex', flexDirection: 'column', animation: 'slideUp 260ms cubic-bezier(.2,.8,.2,1)' }}>
       <div style={{ padding: 'max(12px, env(safe-area-inset-top, 0px)) 16px 12px', borderBottom: `1px solid ${theme.border}`, flexShrink: 0 }}>
@@ -93,26 +117,30 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
             <IconBack size={20} stroke={theme.text} sw={2} />
           </button>
           <div style={{ flex: 1, fontFamily: theme.sans, fontSize: 16, fontWeight: 600, color: theme.text }}>Profile</div>
-          <button type="button" aria-label="Edit profile" onClick={() => setShowEdit(true)} style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer' }}>
-            <IconEdit size={18} stroke={theme.muted} sw={1.8} />
-          </button>
+          {signedIn ? (
+            <button type="button" aria-label="Edit profile" onClick={() => setShowEdit(true)} style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer' }}>
+              <IconEdit size={18} stroke={theme.muted} sw={1.8} />
+            </button>
+          ) : null}
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 30 }}>
         <div style={{ padding: '20px 16px 18px', display: 'flex', gap: 16, alignItems: 'center' }}>
           <div style={{ position: 'relative', flexShrink: 0 }}>
-            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} disabled={avatarUploading} onChange={(e) => { onAvatarPick(e.target.files?.[0]); e.target.value = ''; }} />
-            <button type="button" disabled={avatarUploading} onClick={() => avatarInputRef.current?.click()} aria-label="Change profile photo" aria-busy={avatarUploading} style={{ background: 'none', border: 'none', padding: 0, cursor: avatarUploading ? 'wait' : 'pointer', position: 'relative', opacity: avatarUploading ? 0.75 : 1 }}>
+            <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} disabled={avatarUploading || !signedIn} onChange={(e) => { onAvatarPick(e.target.files?.[0]); e.target.value = ''; }} />
+            <button type="button" disabled={avatarUploading} onClick={() => { if (!signedIn) { setShowSignIn(true); return; } avatarInputRef.current?.click(); }} aria-label="Change profile photo" aria-busy={avatarUploading} style={{ background: 'none', border: 'none', padding: 0, cursor: avatarUploading ? 'wait' : 'pointer', position: 'relative', opacity: avatarUploading ? 0.75 : 1 }}>
               <ProfileAvatar profile={profile} size={72} theme={theme} style={{ border: `2.5px solid ${theme.accent}` }} />
               {avatarUploading ? (
                 <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontFamily: theme.sans, fontSize: 11, fontWeight: 600, color: '#fff' }}>…</span>
                 </div>
               ) : null}
-              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: theme.accent, border: `2.5px solid ${theme.surface}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconCamera size={13} stroke="#fff" sw={2} />
-              </div>
+              {signedIn ? (
+                <div style={{ position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: '50%', background: theme.accent, border: `2.5px solid ${theme.surface}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconCamera size={13} stroke="#fff" sw={2} />
+                </div>
+              ) : null}
             </button>
             {avatarError ? (
               <div style={{ position: 'absolute', left: 0, top: '100%', marginTop: 6, width: 160, fontFamily: theme.sans, fontSize: 11, color: '#c0392b', lineHeight: 1.35 }}>{avatarError}</div>
@@ -121,6 +149,9 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: theme.sans, fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: -0.3 }}>{profile.displayName}</div>
             <div style={{ fontFamily: theme.sans, fontSize: 13, color: theme.muted, marginTop: 1 }}>@{profile.handle}</div>
+            {profile.email ? (
+              <div style={{ fontFamily: theme.sans, fontSize: 12, color: theme.muted, marginTop: 4 }}>{profile.email}</div>
+            ) : null}
             {profile.instagramUrl ? (
               <a href={profile.instagramUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, textDecoration: 'none' }}>
                 <IconInstagram size={15} stroke={theme.muted} sw={1.7} />
@@ -138,6 +169,49 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
           </div>
         </div>
 
+        <div style={{ padding: '0 16px 16px' }}>
+          {signedIn ? (
+            <button
+              type="button"
+              disabled={authBusy}
+              onClick={() => { void onSignOut(); }}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: 999,
+                border: `1px solid ${theme.border}`,
+                background: theme.surface,
+                color: theme.text,
+                fontFamily: theme.sans,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: authBusy ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {authBusy ? 'Signing out…' : 'Sign out'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSignIn(true)}
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: 999,
+                border: 'none',
+                background: theme.accent,
+                color: theme.onAccent || '#fff',
+                fontFamily: theme.sans,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Sign in with Google
+            </button>
+          )}
+        </div>
+
         <div style={{ display: 'flex', borderBottom: `1px solid ${theme.border}`, marginBottom: 14, paddingLeft: 16, paddingRight: 16 }}>
           {[['posts', 'Posts'], ['lists', 'Lists']].map(([id, lbl]) => (
             <button key={id} type="button" onClick={() => setActiveTab(id)} style={{ flex: 1, padding: '9px 0', background: 'none', border: 'none', cursor: 'pointer', fontFamily: theme.sans, fontSize: 14, fontWeight: activeTab === id ? 700 : 500, color: activeTab === id ? theme.text : theme.muted, borderBottom: `2px solid ${activeTab === id ? theme.accent : 'transparent'}`, marginBottom: -1 }}>
@@ -149,7 +223,7 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
         <div style={{ padding: '0 16px' }}>
           {activeTab === 'posts' && (
             myPosts.length === 0
-              ? <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: theme.sans, fontSize: 14, color: theme.muted }}>No posts yet.</div>
+              ? <div style={{ textAlign: 'center', padding: '40px 0', fontFamily: theme.sans, fontSize: 14, color: theme.muted }}>{signedIn ? 'No posts yet.' : 'Sign in to see your posts.'}</div>
               : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                   {myPosts.map((p) => (
@@ -170,7 +244,7 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
               )
           )}
 
-          {activeTab === 'lists' ? <ListsSection theme={theme} onOpenList={onOpenList} ownOnly onNewList={onNewList} /> : null}
+          {activeTab === 'lists' ? <ListsSection theme={theme} onOpenList={onOpenList} ownOnly onNewList={signedIn ? onNewList : () => setShowSignIn(true)} /> : null}
         </div>
       </div>
 
@@ -180,6 +254,19 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
           profile={profile}
           onClose={() => setShowEdit(false)}
           onSaved={() => setTick((t) => t + 1)}
+        />
+      ) : null}
+
+      {showSignIn && SignInSheet ? (
+        <SignInSheet
+          theme={theme}
+          onClose={(ok) => {
+            setShowSignIn(false);
+            window.V2Live?.completeSignInRequest?.(Boolean(ok));
+            setTick((t) => t + 1);
+          }}
+          onSignedIn={() => setTick((t) => t + 1)}
+          reason="Sign in with Google to manage your profile, posts, and lists."
         />
       ) : null}
     </div>

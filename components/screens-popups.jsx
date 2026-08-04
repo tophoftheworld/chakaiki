@@ -321,3 +321,108 @@ function PopUpCalendar({ theme, value, onChange, disabled = false }) {
 }
 
 window.PopUpCalendar = PopUpCalendar;
+
+/** Google sign-in bottom sheet — used when anonymous users try to contribute. */
+function SignInSheet({ theme, onClose, onSignedIn, reason }) {
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+
+  const signIn = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const ok = await window.V2Live?.signInWithGoogle?.();
+      if (ok) {
+        onSignedIn?.();
+        onClose?.(true);
+        return;
+      }
+      // Redirect flow started — page will reload.
+      setError('Redirecting to Google…');
+    } catch (e) {
+      const msg = e?.message || 'Could not sign in';
+      if (msg !== 'Sign-in cancelled') setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const dismiss = () => onClose?.(false);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="signin-sheet-title"
+      style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end' }}
+      onClick={dismiss}
+    >
+      <div
+        style={{ width: '100%', borderRadius: '20px 20px 0 0', background: theme.card, border: `1px solid ${theme.border}`, padding: '22px 20px 36px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ width: 36, height: 4, borderRadius: 999, background: theme.border, margin: '0 auto 16px' }} />
+        <div id="signin-sheet-title" style={{ fontFamily: theme.sans, fontSize: 18, fontWeight: 700, color: theme.text, marginBottom: 8 }}>
+          Sign in to continue
+        </div>
+        <div style={{ fontFamily: theme.sans, fontSize: 14, color: theme.muted, lineHeight: 1.45, marginBottom: 20 }}>
+          {reason || 'Sign in with Google to post, comment, or save lists. You can still browse without an account.'}
+        </div>
+        {error ? (
+          <div style={{ fontFamily: theme.sans, fontSize: 13, color: '#c0392b', marginBottom: 12, lineHeight: 1.4 }}>{error}</div>
+        ) : null}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => { void signIn(); }}
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            borderRadius: 999,
+            border: 'none',
+            background: busy ? theme.border : theme.accent,
+            color: busy ? theme.muted : (theme.onAccent || '#fff'),
+            fontFamily: theme.sans,
+            fontSize: 15,
+            fontWeight: 700,
+            cursor: busy ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/>
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.1 4 9.3 8.5 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.3 35.1 26.8 36 24 36c-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.2 39.4 16 44 24 44z"/>
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.7-6.6 7.1l.1.1 6.3 5.3C36.8 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/>
+          </svg>
+          {busy ? 'Signing in…' : 'Continue with Google'}
+        </button>
+        <button
+          type="button"
+          onClick={dismiss}
+          style={{
+            width: '100%',
+            marginTop: 10,
+            padding: '12px 16px',
+            borderRadius: 999,
+            border: `1px solid ${theme.border}`,
+            background: theme.surface,
+            color: theme.text,
+            fontFamily: theme.sans,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+}
+
+window.SignInSheet = SignInSheet;
