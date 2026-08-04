@@ -1,3 +1,6 @@
 js/config.js
 .app-source.jsx
 node_modules/
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+.firebase/hosting..cache

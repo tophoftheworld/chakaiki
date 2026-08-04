@@ -6,5 +6,8 @@
     "migrate:firestore": "node scripts/migrate-firestore.mjs",
     "migrate:firestore:dry": "node scripts/migrate-firestore.mjs --dry-run",
     "migrate:owner-ids": "node scripts/migrate-owner-ids.mjs"
+  },
+  "devDependencies": {
+    "firebase-admin": "^12.7.0"
   }
 }

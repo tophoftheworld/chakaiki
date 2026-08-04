@@ -1,7 +1,8 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Replace with founder Firebase Auth UID after running migrate-owner-ids.mjs
+    // After Google sign-in as founder, replace FOUNDER_UID_PLACEHOLDER with that Auth UID
+    // (Profile screen shows "ID: …"). Then: firebase deploy --only firestore:rules,storage
     function isAdmin() {
       return request.auth != null
         && request.auth.uid in ['FOUNDER_UID_PLACEHOLDER'];
