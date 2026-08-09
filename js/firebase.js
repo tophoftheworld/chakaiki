@@ -159,25 +159,26 @@ export function getCurrentProfile() {
   const firebase = getFirebase();
   const user = (firebase?.auth && firebase.apps?.length) ? firebase.auth().currentUser : null;
   const uid = user?.uid || getCurrentUserId() || '';
-  if (!uid) {
+  const anonymous = Boolean(!user || user.isAnonymous || !uid);
+  if (!uid || anonymous) {
     return {
-      ownerId: '',
-      name: 'Member',
-      username: '@member',
+      ownerId: uid || '',
+      name: 'Guest',
+      username: '',
       email: '',
       photoURL: null,
       isAnonymous: true,
     };
   }
   const handle = deriveHandleFromUser(user);
-  const name = String(user?.displayName || '').trim() || handle || 'Member';
+  const name = String(user?.displayName || '').trim() || handle || 'Guest';
   return {
     ownerId: uid,
     name,
     username: `@${handle}`,
     email: String(user?.email || '').trim(),
     photoURL: user?.photoURL || null,
-    isAnonymous: Boolean(!user || user.isAnonymous),
+    isAnonymous: false,
   };
 }
 

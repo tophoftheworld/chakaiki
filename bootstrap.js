@@ -1,5 +1,5 @@
-import * as DataMod from './js/data.js?v=20260804a';
-import * as FirebaseMod from './js/firebase.js?v=20260804a';
+import * as DataMod from './js/data.js?v=20260809a';
+import * as FirebaseMod from './js/firebase.js?v=20260809a';
 
 const getCurrentProfile = FirebaseMod.getCurrentProfile;
 const getStorage = FirebaseMod.getStorage;
@@ -1053,9 +1053,25 @@ async function loadUserProfileDoc() {
 function mergeV2Profile(baseProf, extra) {
   const p = baseProf || {};
   const e = extra || {};
+  const anonymous = Boolean(p.isAnonymous);
+  if (anonymous) {
+    return {
+      ownerId: p.ownerId || '',
+      displayName: 'Guest',
+      username: '',
+      handle: '',
+      avatarInitial: 'G',
+      avatarUrl: null,
+      email: '',
+      isAnonymous: true,
+      isRealUser: false,
+      instagram: '',
+      instagramUrl: '',
+    };
+  }
   const name = String(e.displayName || p.name || '').trim();
   const uname = String(e.username || p.username || '').trim();
-  const handle = uname.replace(/^@/, '') || 'member';
+  const handle = uname.replace(/^@/, '') || 'user';
   const initial = String(name || handle || '?').replace(/^@/, '').trim().slice(0, 1).toUpperCase() || '?';
   const instagram = String(e.instagram || '').trim().replace(/^@/, '');
   const instagramUrl = instagram ? `https://instagram.com/${instagram}` : '';
@@ -1067,8 +1083,8 @@ function mergeV2Profile(baseProf, extra) {
     avatarInitial: initial,
     avatarUrl: e.avatarUrl || p.photoURL || null,
     email: p.email || '',
-    isAnonymous: Boolean(p.isAnonymous),
-    isRealUser: Boolean(p.ownerId && p.isAnonymous === false),
+    isAnonymous: false,
+    isRealUser: Boolean(p.ownerId),
     instagram,
     instagramUrl,
   };

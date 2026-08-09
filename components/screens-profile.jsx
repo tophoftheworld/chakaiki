@@ -70,9 +70,10 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
   }, []);
 
   const profile = window.V2Live?.getProfile?.() || {
-    displayName: 'Member',
-    handle: 'member',
-    avatarInitial: '?',
+    displayName: 'Guest',
+    handle: '',
+    avatarInitial: 'G',
+    isAnonymous: true,
   };
   const signedIn = Boolean(window.V2Live?.isRealUser?.() || profile.isRealUser);
   const SignInSheet = window.SignInSheet;
@@ -147,21 +148,27 @@ function UserProfileScreen({ theme, onClose, onOpenPost, onOpenList, onNewList }
             ) : null}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: theme.sans, fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: -0.3 }}>{profile.displayName}</div>
-            <div style={{ fontFamily: theme.sans, fontSize: 13, color: theme.muted, marginTop: 1 }}>@{profile.handle}</div>
-            {profile.email ? (
+            <div style={{ fontFamily: theme.sans, fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: -0.3 }}>{signedIn ? profile.displayName : 'Guest'}</div>
+            {signedIn ? (
+              <div style={{ fontFamily: theme.sans, fontSize: 13, color: theme.muted, marginTop: 1 }}>@{profile.handle}</div>
+            ) : (
+              <div style={{ fontFamily: theme.sans, fontSize: 13, color: theme.muted, marginTop: 1 }}>Browsing as guest · Not signed in</div>
+            )}
+            {signedIn && profile.email ? (
               <div style={{ fontFamily: theme.sans, fontSize: 12, color: theme.muted, marginTop: 4 }}>{profile.email}</div>
             ) : null}
-            {profile.instagramUrl ? (
+            {signedIn && profile.instagramUrl ? (
               <a href={profile.instagramUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, textDecoration: 'none' }}>
                 <IconInstagram size={15} stroke={theme.muted} sw={1.7} />
                 <span style={{ fontFamily: theme.sans, fontSize: 13, color: theme.accent, fontWeight: 600 }}>@{profile.instagram}</span>
               </a>
             ) : null}
-            <div style={{ fontFamily: theme.sans, fontSize: 12, color: theme.muted, marginTop: 4 }}>
-              {memberLine}
-            </div>
-            {profile.ownerId ? (
+            {signedIn ? (
+              <div style={{ fontFamily: theme.sans, fontSize: 12, color: theme.muted, marginTop: 4 }}>
+                {memberLine}
+              </div>
+            ) : null}
+            {signedIn && profile.ownerId ? (
               <div style={{ fontFamily: theme.mono || 'ui-monospace, monospace', fontSize: 10, color: theme.muted, marginTop: 8, wordBreak: 'break-all', lineHeight: 1.4 }} title="Firebase user ID (for migration / admin setup)">
                 ID: {profile.ownerId}
               </div>

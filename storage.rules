@@ -1,11 +1,10 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // After Google sign-in as founder, replace FOUNDER_UID_PLACEHOLDER with that Auth UID
-    // (Profile screen shows "ID: …"). Then: firebase deploy --only firestore:rules,storage
+    // Founder: david.toph@gmail.com (Google Auth UID)
     function isAdmin() {
       return request.auth != null
-        && request.auth.uid in ['FOUNDER_UID_PLACEHOLDER'];
+        && request.auth.uid in ['kgWcRHtWRiSoQg7CJV2vkIhfUOR2'];
     }
 
     function isImageUpload() {
