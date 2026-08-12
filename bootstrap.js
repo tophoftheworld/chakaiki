@@ -1222,8 +1222,8 @@ window.V2Live = {
     if (coverPhotoFile) {
       const urls = await uploadPhotoFiles(eventId, [coverPhotoFile], {
         storageRoot: 'events',
-        maxDimension: 512,
-        quality: 0.82,
+        maxDimension: 1920,
+        quality: 0.88,
       });
       coverPhoto = urls[0] || null;
     }
