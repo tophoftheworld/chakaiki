@@ -1002,6 +1002,7 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
   const [coverPreview, setCoverPreview] = React.useState(initial.coverPreview);
   const [coverFile, setCoverFile] = React.useState(null);
   const [coverFocus, setCoverFocus] = React.useState(initial.coverFocus || { x: 50, y: 50 });
+  const [coverRepositionOpen, setCoverRepositionOpen] = React.useState(false);
   const [busyAction, setBusyAction] = React.useState(null);
   const [joiningEventId, setJoiningEventId] = React.useState(null);
   const coverInputRef = React.useRef(null);
@@ -1109,9 +1110,11 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
     if (!file) return;
     setCoverFile(file);
     setCoverFocus({ x: 50, y: 50 });
+    setCoverRepositionOpen(true);
     const reader = new FileReader();
     reader.onload = () => setCoverPreview(reader.result);
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const buildPayload = () => {
