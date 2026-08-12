@@ -1,5 +1,5 @@
-import * as DataMod from './js/data.js?v=20260812a';
-import * as FirebaseMod from './js/firebase.js?v=20260812a';
+import * as DataMod from './js/data.js?v=20260812b';
+import * as FirebaseMod from './js/firebase.js?v=20260812b';
 
 const getCurrentProfile = FirebaseMod.getCurrentProfile;
 const getStorage = FirebaseMod.getStorage;
@@ -1243,8 +1243,8 @@ window.V2Live = {
     if (coverPhotoFile) {
       const urls = await uploadPhotoFiles(id, [coverPhotoFile], {
         storageRoot: 'events',
-        maxDimension: 512,
-        quality: 0.82,
+        maxDimension: 1920,
+        quality: 0.88,
       });
       updatePayload.coverPhoto = urls[0] || null;
     } else if (keepCoverPhoto) {
