@@ -1,5 +1,5 @@
-import * as DataMod from './js/data.js?v=20260812c';
-import * as FirebaseMod from './js/firebase.js?v=20260812c';
+import * as DataMod from './js/data.js?v=20260812d';
+import * as FirebaseMod from './js/firebase.js?v=20260812d';
 
 const getCurrentProfile = FirebaseMod.getCurrentProfile;
 const getStorage = FirebaseMod.getStorage;

@@ -1411,20 +1411,66 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
                 ? <img src={coverPreview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: coverObjectPosition(coverFocus) }} />
                 : <Placeholder label="" hue={120} style={{ width: '100%', height: '100%', borderRadius: 0 }} />}
             </div>
-            <div style={{ textAlign: 'left' }}>
+            <div style={{ textAlign: 'left', flex: 1 }}>
               <div style={{ fontFamily: theme.sans, fontSize: 13, fontWeight: 600, color: theme.text }}>{coverPreview ? 'Change photo' : 'Add cover photo'}</div>
-              <div style={{ fontFamily: theme.sans, fontSize: 11, color: theme.muted, marginTop: 2 }}>{coverPreview ? 'Then drag below to reposition' : 'Wide banners work well'}</div>
+              <div style={{ fontFamily: theme.sans, fontSize: 11, color: theme.muted, marginTop: 2 }}>
+                {coverRepositionOpen ? 'Drag below to frame the banner' : (coverPreview ? 'Upload a new photo to reposition' : 'Wide banners work well')}
+              </div>
             </div>
           </button>
-          {coverPreview ? (
-            <CoverFocusEditor
-              theme={theme}
-              src={coverPreview}
-              focus={coverFocus}
-              onChange={setCoverFocus}
-              locked={locked}
-              label="Reposition cover"
-            />
+          {coverPreview && !coverRepositionOpen ? (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => setCoverRepositionOpen(true)}
+              style={{
+                marginTop: 8,
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `1px solid ${theme.border}`,
+                background: theme.card,
+                cursor: locked ? 'not-allowed' : 'pointer',
+                fontFamily: theme.sans,
+                fontSize: 13,
+                fontWeight: 600,
+                color: theme.text,
+              }}
+            >
+              Reposition cover
+            </button>
+          ) : null}
+          {coverPreview && coverRepositionOpen ? (
+            <>
+              <CoverFocusEditor
+                theme={theme}
+                src={coverPreview}
+                focus={coverFocus}
+                onChange={setCoverFocus}
+                locked={locked}
+                label="Reposition cover"
+              />
+              <button
+                type="button"
+                disabled={locked}
+                onClick={() => setCoverRepositionOpen(false)}
+                style={{
+                  marginTop: 8,
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'none',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  fontFamily: theme.sans,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: theme.muted,
+                }}
+              >
+                Done repositioning
+              </button>
+            </>
           ) : null}
         </FormSection>
           </fieldset>
