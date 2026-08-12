@@ -1,5 +1,5 @@
-import * as DataMod from './js/data.js?v=20260809a';
-import * as FirebaseMod from './js/firebase.js?v=20260809a';
+import * as DataMod from './js/data.js?v=20260812a';
+import * as FirebaseMod from './js/firebase.js?v=20260812a';
 
 const getCurrentProfile = FirebaseMod.getCurrentProfile;
 const getStorage = FirebaseMod.getStorage;
@@ -104,6 +104,7 @@ function toV2UiEvent(e) {
     lat: typeof e.lat === 'number' ? e.lat : (e.lat != null ? Number(e.lat) : null),
     lng: typeof e.lng === 'number' ? e.lng : (e.lng != null ? Number(e.lng) : null),
     coverPhoto: e.coverPhoto || null,
+    coverFocus: e.coverFocus || { x: 50, y: 50 },
     coverHue: Number(e.coverHue) || 120,
     status: e.status || 'upcoming',
     submittedBy: e.submittedBy || '',
@@ -1832,6 +1833,7 @@ window.V2Live = {
             type: ev?.type || '',
             status: ev?.status || '',
             coverPhoto: ev?.coverPhoto || null,
+            coverFocus: ev?.coverFocus || { x: 50, y: 50 },
             coverHue: ev?.coverHue,
             merchantIds: ev?.merchantIds || [],
             brandId: ev?.brandId || null,

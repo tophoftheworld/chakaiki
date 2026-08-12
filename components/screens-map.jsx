@@ -112,6 +112,7 @@ function MapScreen({ theme, onOpenDetail, onOpenBrand, onOpenStandaloneLocation,
           avgRating: pin.avgRating || 0,
           photo: pin.photo || pin.coverPhoto || null,
           coverPhoto: pin.coverPhoto || pin.photo || null,
+          coverFocus: pin.coverFocus || { x: 50, y: 50 },
           coverHue: pin.coverHue,
           dateLabel: pin.dateLabel || '',
           type: pin.type || '',
@@ -299,7 +300,16 @@ function MapScreen({ theme, onOpenDetail, onOpenBrand, onOpenStandaloneLocation,
               <div style={{ display: 'flex', gap: 12, padding: 14 }}>
                 <div style={{ width: 68, height: 68, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
                   {selectedPin.coverPhoto || selectedPin.photo ? (
-                    <img src={selectedPin.coverPhoto || selectedPin.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={selectedPin.coverPhoto || selectedPin.photo}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: `${Number(selectedPin.coverFocus?.x) || 50}% ${Number(selectedPin.coverFocus?.y) || 50}%`,
+                      }}
+                    />
                   ) : (
                     <Placeholder label="" hue={selectedPin.coverHue ?? 120} />
                   )}
