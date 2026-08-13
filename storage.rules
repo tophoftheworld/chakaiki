@@ -1,10 +1,10 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Replace with founder Firebase Auth UID after running migrate-owner-ids.mjs
+    // Founder: david.toph@gmail.com (Google Auth UID)
     function isAdmin() {
       return request.auth != null
-        && request.auth.uid in ['FOUNDER_UID_PLACEHOLDER'];
+        && request.auth.uid in ['kgWcRHtWRiSoQg7CJV2vkIhfUOR2'];
     }
 
     function isImageUpload() {

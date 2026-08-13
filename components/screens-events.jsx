@@ -642,7 +642,7 @@ function EventCard({ event, theme, onOpen }) {
             background: theme.surface2,
           }}>
             {event.coverPhoto
-              ? <img src={event.coverPhoto} alt="" style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'cover', display: 'block' }} />
+              ? <img src={event.coverPhoto} alt="" style={{ width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%', objectFit: 'cover', objectPosition: coverObjectPosition(event.coverFocus), display: 'block' }} />
               : <Placeholder label="" hue={event.coverHue} style={{ width: '100%', height: '100%', borderRadius: 0 }} />}
           </div>
           <div style={{ flex: 1, minWidth: 0, paddingLeft: 14, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
@@ -680,6 +680,108 @@ function EventCard({ event, theme, onOpen }) {
   );
 }
 
+function normalizeCoverFocus(raw) {
+  const x = Number(raw?.x);
+  const y = Number(raw?.y);
+  return {
+    x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+    y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50,
+  };
+}
+
+function coverObjectPosition(focus) {
+  const f = normalizeCoverFocus(focus);
+  return `${f.x}% ${f.y}%`;
+}
+
+/** Drag (or tap-drag) to set object-position focus for a cover photo. */
+function CoverFocusEditor({ theme, src, focus, onChange, locked = false, label = 'Reposition' }) {
+  const frameRef = React.useRef(null);
+  const dragging = React.useRef(false);
+  const f = normalizeCoverFocus(focus);
+
+  const setFromPointer = React.useCallback((clientX, clientY) => {
+    const el = frameRef.current;
+    if (!el || locked) return;
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    onChange?.(normalizeCoverFocus({ x, y }));
+  }, [locked, onChange]);
+
+  const onPointerDown = (e) => {
+    if (locked) return;
+    dragging.current = true;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setFromPointer(e.clientX, e.clientY);
+  };
+  const onPointerMove = (e) => {
+    if (!dragging.current) return;
+    setFromPointer(e.clientX, e.clientY);
+  };
+  const onPointerUp = () => { dragging.current = false; };
+
+  if (!src) return null;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+        <div style={{ fontFamily: theme.sans, fontSize: 11, fontWeight: 600, color: theme.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
+        <div style={{ fontFamily: theme.sans, fontSize: 11, color: theme.muted }}>Drag to frame the photo</div>
+      </div>
+      <div
+        ref={frameRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{
+          width: '100%',
+          height: 160,
+          borderRadius: 12,
+          overflow: 'hidden',
+          border: `1px solid ${theme.border}`,
+          background: theme.surface2,
+          position: 'relative',
+          cursor: locked ? 'not-allowed' : 'grab',
+          touchAction: 'none',
+          userSelect: 'none',
+          opacity: locked ? 0.6 : 1,
+        }}
+      >
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: coverObjectPosition(f),
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+        <div style={{
+          position: 'absolute',
+          left: `${f.x}%`,
+          top: `${f.y}%`,
+          width: 18,
+          height: 18,
+          marginLeft: -9,
+          marginTop: -9,
+          borderRadius: '50%',
+          border: '2px solid #fff',
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)',
+          background: 'rgba(35,156,2,0.85)',
+          pointerEvents: 'none',
+        }} />
+      </div>
+    </div>
+  );
+}
+
 function initialFormFromEvent(event, presetBrandId) {
   if (!event) {
     return {
@@ -692,6 +794,7 @@ function initialFormFromEvent(event, presetBrandId) {
       merchantIds: presetBrandId ? [String(presetBrandId)] : [],
       dates: [],
       coverPreview: null,
+      coverFocus: { x: 50, y: 50 },
       placeId: null,
       lat: null,
       lng: null,
@@ -729,6 +832,7 @@ function initialFormFromEvent(event, presetBrandId) {
     address: event.address || '',
     dates: eventDateKeys(event),
     coverPreview: event.coverPhoto || null,
+    coverFocus: normalizeCoverFocus(event.coverFocus),
     placeId: event.placeId || null,
     lat: event.lat ?? null,
     lng: event.lng ?? null,
@@ -897,6 +1001,8 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
   const [brandPickerOpen, setBrandPickerOpen] = React.useState(false);
   const [coverPreview, setCoverPreview] = React.useState(initial.coverPreview);
   const [coverFile, setCoverFile] = React.useState(null);
+  const [coverFocus, setCoverFocus] = React.useState(initial.coverFocus || { x: 50, y: 50 });
+  const [coverRepositionOpen, setCoverRepositionOpen] = React.useState(false);
   const [busyAction, setBusyAction] = React.useState(null);
   const [joiningEventId, setJoiningEventId] = React.useState(null);
   const coverInputRef = React.useRef(null);
@@ -1003,9 +1109,12 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
     const file = e.target.files?.[0];
     if (!file) return;
     setCoverFile(file);
+    setCoverFocus({ x: 50, y: 50 });
+    setCoverRepositionOpen(true);
     const reader = new FileReader();
     reader.onload = () => setCoverPreview(reader.result);
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const buildPayload = () => {
@@ -1034,6 +1143,7 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
     if (dateFields.eventDates) payload.eventDates = dateFields.eventDates;
     if (coverFile) payload.coverPhotoFile = coverFile;
     else if (isEdit && event?.coverPhoto) payload.keepCoverPhoto = event.coverPhoto;
+    payload.coverFocus = normalizeCoverFocus(coverFocus);
     return payload;
   };
 
@@ -1298,14 +1408,70 @@ function EventFormModal({ theme, onClose, event = null, onDeleted = null, preset
           }}>
             <div style={{ width: 56, height: 56, borderRadius: 10, overflow: 'hidden', background: theme.card, flexShrink: 0 }}>
               {coverPreview
-                ? <img src={coverPreview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <img src={coverPreview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: coverObjectPosition(coverFocus) }} />
                 : <Placeholder label="" hue={120} style={{ width: '100%', height: '100%', borderRadius: 0 }} />}
             </div>
-            <div style={{ textAlign: 'left' }}>
+            <div style={{ textAlign: 'left', flex: 1 }}>
               <div style={{ fontFamily: theme.sans, fontSize: 13, fontWeight: 600, color: theme.text }}>{coverPreview ? 'Change photo' : 'Add cover photo'}</div>
-              <div style={{ fontFamily: theme.sans, fontSize: 11, color: theme.muted, marginTop: 2 }}>Square works best</div>
+              <div style={{ fontFamily: theme.sans, fontSize: 11, color: theme.muted, marginTop: 2 }}>
+                {coverRepositionOpen ? 'Drag below to frame the banner' : (coverPreview ? 'Upload a new photo to reposition' : 'Wide banners work well')}
+              </div>
             </div>
           </button>
+          {coverPreview && !coverRepositionOpen ? (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => setCoverRepositionOpen(true)}
+              style={{
+                marginTop: 8,
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `1px solid ${theme.border}`,
+                background: theme.card,
+                cursor: locked ? 'not-allowed' : 'pointer',
+                fontFamily: theme.sans,
+                fontSize: 13,
+                fontWeight: 600,
+                color: theme.text,
+              }}
+            >
+              Reposition cover
+            </button>
+          ) : null}
+          {coverPreview && coverRepositionOpen ? (
+            <>
+              <CoverFocusEditor
+                theme={theme}
+                src={coverPreview}
+                focus={coverFocus}
+                onChange={setCoverFocus}
+                locked={locked}
+                label="Reposition cover"
+              />
+              <button
+                type="button"
+                disabled={locked}
+                onClick={() => setCoverRepositionOpen(false)}
+                style={{
+                  marginTop: 8,
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'none',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  fontFamily: theme.sans,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: theme.muted,
+                }}
+              >
+                Done repositioning
+              </button>
+            </>
+          ) : null}
         </FormSection>
           </fieldset>
         </div>
@@ -1492,7 +1658,7 @@ function EventDetailScreen({ theme, eventId, onBack, onOpenBrand, bottomInset = 
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: bottomInset }}>
         <div style={{ height: 200, position: 'relative' }}>
           {event.coverPhoto
-            ? <img src={event.coverPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={event.coverPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: coverObjectPosition(event.coverFocus) }} />
             : <Placeholder label="" hue={event.coverHue} style={{ width: '100%', height: '100%', borderRadius: 0 }} />}
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 55%)' }} />
           <div style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>

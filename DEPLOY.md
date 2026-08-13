@@ -320,32 +320,40 @@ Do not point half the traffic at the old project and half at the new one without
 
 ## Auth and user identity (know before launch)
 
-The app uses **Firebase Anonymous Auth** for a stable per-device `userId` when `CHAKAIKI_SKIP_ANONYMOUS_AUTH` is `false`. Posts, lists, events, and comments are attributed to `request.auth.uid`.
+Browsing uses **Firebase Anonymous Auth**. Contributing (post / comment / save list / submit event) requires **Google sign-in**. Anonymous sessions are linked to Google when possible so pre-sign-in content stays on the same UID.
 
-Legacy content may still use owner id `matchaontoph` until you run the owner migration (below).
+### Enable Google provider (required)
 
-Plan real multi-user sign-in (Google, email, etc.) when you outgrow the anonymous beta model.
+1. Firebase Console → Authentication → Sign-in method → enable **Google** (set a project support email).
+2. Authentication → Settings → **Authorized domains**: include `chakaiki.web.app`, `chakaiki.firebaseapp.com`, `localhost`, and any custom domain.
+3. Keep **Anonymous** enabled so guests can still browse.
 
-### Phase 0 — deploy order (security hardening)
+### Founder migration (legacy `matchaontoph` → your Google account)
 
 1. **Build and deploy the client** (`npm run build`, then `firebase deploy --only hosting`).
-2. **Enable Anonymous Auth** in Firebase Console → Authentication → Sign-in method.
-3. Open the app → **Profile** → copy the **User ID** shown at the bottom of the profile card.
-4. **Migrate legacy ownership** (if you have `matchaontoph` content):
+2. Open the app → **Profile** → **Sign in with Google** as `david.toph@gmail.com`.
+3. Copy the **User ID** shown at the bottom of the profile card.
+4. Download a service account key: Project settings → Service accounts → Generate new private key. Do **not** commit the JSON.
+5. Install Admin SDK and migrate:
 
    ```bash
-   npm run migrate:owner-ids -- --uid YOUR_FIREBASE_UID
-   npm run migrate:owner-ids -- --uid YOUR_FIREBASE_UID --dry-run   # preview first
+   npm install
+   # preview:
+   npm run migrate:owner-ids -- --uid YOUR_FIREBASE_UID --dry-run --service-account ./serviceAccount.json
+   # apply:
+   npm run migrate:owner-ids -- --uid YOUR_FIREBASE_UID --service-account ./serviceAccount.json
    ```
 
-5. **Set founder UID in rules** — replace `FOUNDER_UID_PLACEHOLDER` in both `firestore.rules` and `storage.rules` with your UID from step 3.
-6. **Deploy rules**:
+   Or set `GOOGLE_APPLICATION_CREDENTIALS` instead of `--service-account`.
+
+6. **Set founder UID in rules** — replace `FOUNDER_UID_PLACEHOLDER` in both `firestore.rules` and `storage.rules` with the UID from step 3.
+7. **Deploy rules**:
 
    ```bash
    firebase deploy --only firestore:rules,storage
    ```
 
-7. Smoke-test: create post, edit/delete own post, upload avatar, brand admin (founder only).
+8. Smoke-test: sign out → browse anonymously → tap + → Google sheet → post as yourself; legacy `matchaontoph` posts should show as yours.
 
 `post-admin.html` is kept locally for dev but **excluded from hosting** (`firebase.json`).
 

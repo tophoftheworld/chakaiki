@@ -933,6 +933,10 @@ function PostDetailScreen({ theme, postId, onBack, onOpenBrand, onEditPost }) {
     e?.preventDefault?.();
     const val = String(draft || '').trim();
     if (!val || !post) return;
+    if (window.V2Live?.ensureContributor) {
+      const ok = await window.V2Live.ensureContributor();
+      if (!ok) return;
+    }
     setCommentError('');
     const optimistic = { id: `temp-${Date.now()}`, author: 'you', text: val, createdAt: Date.now() };
     setDraft('');

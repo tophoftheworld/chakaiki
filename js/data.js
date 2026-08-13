@@ -1345,6 +1345,14 @@ function normalizeEventDoc(raw) {
     lat: typeof raw.lat === 'number' ? raw.lat : (raw.lat != null ? Number(raw.lat) : null),
     lng: typeof raw.lng === 'number' ? raw.lng : (raw.lng != null ? Number(raw.lng) : null),
     coverPhoto: raw.coverPhoto != null ? String(raw.coverPhoto) : null,
+    coverFocus: (() => {
+      const x = Number(raw?.coverFocus?.x);
+      const y = Number(raw?.coverFocus?.y);
+      return {
+        x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+        y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50,
+      };
+    })(),
     coverHue: Number.isFinite(raw.coverHue) ? raw.coverHue : 120,
     status: ['upcoming', 'ongoing', 'past', 'pending'].includes(raw.status) ? raw.status : 'upcoming',
     submittedBy: raw.submittedBy != null ? String(raw.submittedBy) : '',
@@ -1423,6 +1431,14 @@ function buildEventDoc(payload, { published }) {
     lat: typeof payload?.lat === 'number' ? payload.lat : (payload?.lat != null ? Number(payload.lat) : null),
     lng: typeof payload?.lng === 'number' ? payload.lng : (payload?.lng != null ? Number(payload.lng) : null),
     coverPhoto: payload?.coverPhoto != null ? String(payload.coverPhoto) : null,
+    coverFocus: (() => {
+      const x = Number(payload?.coverFocus?.x);
+      const y = Number(payload?.coverFocus?.y);
+      return {
+        x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+        y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50,
+      };
+    })(),
     coverHue: Number(payload?.coverHue) || 120,
     status: published ? 'upcoming' : 'pending',
     submittedBy: ownerId,
@@ -1492,6 +1508,14 @@ function buildEventPatch(payload) {
   if (payload?.lng !== undefined) patch.lng = typeof payload.lng === 'number' ? payload.lng : (payload.lng != null ? Number(payload.lng) : null);
   if (payload?.coverPhoto !== undefined) {
     patch.coverPhoto = payload.coverPhoto != null ? String(payload.coverPhoto) : null;
+  }
+  if (payload?.coverFocus !== undefined) {
+    const x = Number(payload?.coverFocus?.x);
+    const y = Number(payload?.coverFocus?.y);
+    patch.coverFocus = {
+      x: Number.isFinite(x) ? Math.min(100, Math.max(0, x)) : 50,
+      y: Number.isFinite(y) ? Math.min(100, Math.max(0, y)) : 50,
+    };
   }
   return patch;
 }

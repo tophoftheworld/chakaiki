@@ -102,6 +102,7 @@ function App() {
   const [navStack, setNavStack] = React.useState([]);
   const [bootState, setBootState] = React.useState(getInitialBootState);
   const [showReloadHint, setShowReloadHint] = React.useState(false);
+  const [signInOpen, setSignInOpen] = React.useState(false);
   const [debugLines, setDebugLines] = React.useState(() => {
     try { return window.__V2_DEBUG__?.read?.() || []; } catch (_) { return []; }
   });
@@ -119,6 +120,22 @@ function App() {
     return () => {
       window.removeEventListener('v2:bootstrap-ok', onOk);
       window.removeEventListener('v2:bootstrap-error', onErr);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const onRequest = () => setSignInOpen(true);
+    window.addEventListener('v2:request-signin', onRequest);
+    return () => window.removeEventListener('v2:request-signin', onRequest);
+  }, []);
+
+  React.useEffect(() => {
+    const onAuth = () => setDataVersion((v) => v + 1);
+    window.addEventListener('v2:auth-changed', onAuth);
+    window.addEventListener('v2:profile-updated', onAuth);
+    return () => {
+      window.removeEventListener('v2:auth-changed', onAuth);
+      window.removeEventListener('v2:profile-updated', onAuth);
     };
   }, []);
 
@@ -220,7 +237,13 @@ function App() {
 
   const openBrand = React.useCallback((id) => pushScreen({ name: 'brand', brandId: id }), [pushScreen]);
   const openPost = React.useCallback((id) => pushScreen({ name: 'post', postId: id }), [pushScreen]);
-  const openLog = React.useCallback((ctx) => pushScreen({ name: 'log', context: ctx || {} }), [pushScreen]);
+  const openLog = React.useCallback(async (ctx) => {
+    if (window.V2Live?.ensureContributor) {
+      const ok = await window.V2Live.ensureContributor();
+      if (!ok) return;
+    }
+    pushScreen({ name: 'log', context: ctx || {} });
+  }, [pushScreen]);
   const openBrandFeed = React.useCallback((id) => pushScreen({ name: 'brandFeed', brandId: id }), [pushScreen]);
   const openBrandEvents = React.useCallback((id) => pushScreen({ name: 'brandEvents', brandId: id }), [pushScreen]);
   const openList = React.useCallback((id) => pushScreen({ name: 'list', listId: id }), [pushScreen]);
@@ -285,7 +308,7 @@ function App() {
     setTab(id);
   }, []);
 
-  const handlePlus = React.useCallback(() => {
+  const handlePlus = React.useCallback(async () => {
     const top = navStack.length > 0 ? navStack[navStack.length - 1] : null;
     if (top?.name === 'event') {
       const ev = (window.EVENTS || []).find((e) => String(e.id) === String(top.eventId));
@@ -293,11 +316,11 @@ function App() {
         ? window.effectiveEventStatus(ev)
         : ev?.status;
       if (ev && (status === 'ongoing' || status === 'past')) {
-        openLog({ eventId: top.eventId });
+        await openLog({ eventId: top.eventId });
         return;
       }
     }
-    openLog({});
+    await openLog({});
   }, [navStack, openLog]);
 
   const tabBar = (
@@ -526,10 +549,21 @@ function App() {
     );
   }
 
+  const SignInSheet = window.SignInSheet;
+
   return (
     <div className="stage" style={{ fontFamily: theme.sans, background: theme.surface }}>
       <div className="viewport-shell" style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         {renderContent()}
+        {signInOpen && SignInSheet ? (
+          <SignInSheet
+            theme={theme}
+            onClose={(ok) => {
+              setSignInOpen(false);
+              window.V2Live?.completeSignInRequest?.(Boolean(ok));
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
